@@ -1,0 +1,24 @@
+diff --git a/nd.module b/nd.module
+index 3c424e9..6cac3d6 100644
+--- nd.module
++++ nd.module
+@@ -56,6 +56,19 @@ function nd_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
+ function _nd_nodeapi(&$node) {
+ 
+   // Build fiels and regions.
++  
++  //remove fieldsets
++  if (module_exists('fieldgroup')) {
++    foreach (fieldgroup_groups($node->type) as $group) {
++      $group_name = $group['group_name'];
++      if (is_array($node->content[$group_name])) {
++        foreach($node->content[$group_name]['group'] as $field=>$field_data) {
++          $node->content[$field] = $field_data ;  
++        }
++        unset($node->content[$group_name]);
++      }
++    }  
++  }
+   ds_build_fields_and_regions($node, 'nd');
+ 
+   // Special support for RSS.

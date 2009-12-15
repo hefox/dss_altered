@@ -1,0 +1,126 @@
+diff --git a/nd_cck/nd-cck-field-overview-form.tpl.php b/nd_cck/nd-cck-field-overview-form.tpl.php
+deleted file mode 100755
+index 179b98d..0000000
+--- nd_cck/nd-cck-field-overview-form.tpl.php
++++ /dev/null
+@@ -1,90 +0,0 @@
+-<?php
+-// $Id: nd-cck-field-overview-form.tpl.php,v 1.1.2.1 2009/09/11 15:21:29 swentel Exp $
+-
+-/**
+- * @file
+- * Template for fields overview form.
+- */
+-?>
+-
+-<table id="content-field-overview" class="sticky-enabled">
+-  <thead>
+-    <tr>
+-      <th><?php print t('Label'); ?></th>
+-      <th><?php print t('Name'); ?></th>
+-      <th><?php print t('Type'); ?></th>
+-      <th><?php print t('Operations'); ?></th>
+-    </tr>
+-  </thead>
+-  <tbody>
+-    <?php
+-    $count = 0;
+-    foreach ($rows as $row): ?>
+-      <tr class="<?php print $count % 2 == 0 ? 'odd' : 'even'; ?> <?php print $row->class ?>">
+-      <?php
+-      switch ($row->row_type):
+-        case 'field': ?>
+-          <td>
+-            <?php print $row->indentation; ?>
+-            <span class="<?php print $row->label_class; ?>"><?php print $row->label; ?></span>
+-          </td>
+-          <td><?php print $row->field_name; ?></td>
+-          <td><?php print $row->type; ?></td>
+-          <td><?php print $row->configure; ?>&nbsp;&nbsp;<?php print $row->remove; ?></td>
+-          <?php break;
+-        case 'group': ?>
+-          <td>
+-            <?php print $row->indentation; ?>
+-            <span class="<?php print $row->label_class; ?>"><?php print $row->label; ?></span>
+-          </td>
+-          <td><?php print $row->group_name; ?></td>
+-          <td><?php print $row->group_type; ?></td>
+-          <td><?php print $row->configure; ?>&nbsp;&nbsp;<?php print $row->remove; ?></td>
+-          <?php break;
+-        case 'separator': ?>
+-          <td colspan="5" class="region"><?php print t('Add'); ?></td>
+-          <?php break;
+-        case 'add_new_field': ?>
+-          <td>
+-            <?php print $row->indentation; ?>
+-            <div class="<?php print $row->label_class; ?>">
+-              <div class="content-new"><?php print theme('advanced_help_topic', 'content', 'add-new-field') . t('New field'); ?></div>
+-              <?php print $row->label; ?>
+-            </div>
+-          </td>
+-          <td><div class="content-new">&nbsp;</div><?php print $row->field_name; ?></td>
+-          <td><div class="content-new">&nbsp;</div><?php print $row->type; ?></td>
+-          <td><div class="content-new">&nbsp;</div><?php print $row->widget_type; ?></td>
+-          <?php break;
+-        case 'add_existing_field': ?>
+-          <td>
+-            <?php print $row->indentation; ?>
+-            <div class="<?php print $row->label_class; ?>">
+-              <div class="content-new"><?php print theme('advanced_help_topic', 'content', 'add-existing-field') . t('Existing field'); ?></div>
+-              <?php print $row->label; ?>
+-            </div>
+-          </td>
+-          <td colspan="2"><div class="content-new">&nbsp;</div><?php print $row->field_name; ?></td>
+-          <td><div class="content-new">&nbsp;</div><?php print $row->widget_type; ?></td>
+-          <?php break;
+-        case 'add_new_group': ?>
+-          <td>
+-            <?php print $row->indentation; ?>
+-            <div class="<?php print $row->label_class; ?>">
+-              <div class="content-new"><?php print theme('advanced_help_topic', 'content', 'add-new-group') . t('New group'); ?></div>
+-              <?php print $row->label; ?>
+-            </div>
+-          </td>
+-          <td><div class="content-new">&nbsp;</div><?php print $row->group_name; ?></td>
+-          <td><div class="content-new">&nbsp;</div><?php print $row->group_type; ?></td>
+-          <td><div class="content-new">&nbsp;</div><?php print $row->group_option; ?></td>
+-        <?php break;
+-      endswitch; ?>
+-      </tr>
+-      <?php $count++;
+-    endforeach; ?>
+-  </tbody>
+-</table>
+-
+-<?php print $submit; ?>
+-
+diff --git a/nd_cck/nd_cck.module b/nd_cck/nd_cck.module
+index 8633e8d..e1c6f94 100644
+--- nd_cck/nd_cck.module
++++ nd_cck/nd_cck.module
+@@ -51,25 +51,6 @@ function nd_cck_menu_alter(&$items) {
+ }
+ 
+ /**
+- * Implementation of hook_theme_registry_alter().
+- */
+-function nd_cck_theme_registry_alter(&$theme_registry) {
+-
+-  $path = drupal_get_path('module', 'nd_cck');
+-
+-  // Alter managing and displaying fields form.
+-  $theme_registry['content_field_overview_form']['template'] = 'nd-cck-field-overview-form';
+-  $theme_registry['content_field_overview_form']['path'] = $path;
+-  $theme_registry['content_field_overview_form']['theme path'] = $path;
+-
+-  // Override theme paths for managing and displaying fields.
+-  $theme_registry['content_field_overview_form']['theme paths'][0] = $path;
+-
+-  // Override the template preprocess function for managing and displaying fields.
+-  $theme_registry['content_field_overview_form']['preprocess functions'][1] = 'template_preprocess_nd_cck_field_overview_form';
+-}
+-
+-/**
+  * Implementation of hook_ds_fields().
+  */
+ function nd_cck_ds_fields($type_name, $build_mode, $extra) {

@@ -1,0 +1,191 @@
+<?php
+/**
+ * @file
+ * Search support for node displays.
+ */
+
+/**
+ * Implementation of hook_content_build_modes().
+ */
+function nd_search_content_build_modes() {
+  $build_modes = array(
+    NODE_BUILD_SEARCH_RESULT => array(
+      'title' => t('Search'),
+      'weight' => 5,
+    ),
+  );
+
+  return $build_modes;
+}
+
+/**
+ * Implementation of hook_form_alter().
+ */
+function nd_search_form_alter(&$form, $form_state, $form_id) {
+
+  if ($form_id == 'nd_settings') {
+    $form['search'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Search'),
+    );
+    $form['search']['nd_overrule_search'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Override default search display.'),
+      '#description' => t('This means ND is implementing the node_search_page function to render search results which you can modify on the display overview form per content type.'),
+      '#default_value' => variable_get('nd_overrule_search', FALSE),
+    );
+
+    // save search settings before rebuild
+    $submit = $form['#submit'][0];
+    $form['#submit'][0] = 'nd_search_settings_submit';
+    $form['#submit'][] = $submit;
+  }
+
+}
+
+/**
+ * Search Settings submit.
+ */
+function nd_search_settings_submit($form, &$form_state) {
+  variable_set('nd_overrule_search', $form_state['values']['nd_overrule_search']);
+}
+
+/**
+ * Creme de la creme:
+ * Put the full node object in the index, so no node_loads are needed for results.
+ */
+function nd_search_apachesolr_update_index(&$document, $node) {
+  $node->body = $node->content['body']['#value'];
+  unset($node->content);
+  $document->tm_node = serialize($node);
+}
+
+/**
+ * Modify the apache solr query, to return the serialized node + body field.
+ */
+function nd_search_apachesolr_modify_query(&$query, &$params, $caller) {
+  $params['fl'] .= ',tm_node';
+}
+
+/**
+ * Get the serialized version from the node, and unserialize it.
+ * @param $doc The apache solr document to be converted.
+ *
+ * @return Node version from the document.
+ */
+function _solr_document_to_node($doc) {
+  $node_serialized = $doc['node']->getField('tm_node');
+  $node = unserialize($node_serialized['value']);
+  // Fallback.
+  if (empty($node)) {
+    $nid = $doc['node']->getFields('nid');
+    $node = node_load($nid);
+  }
+  return $node;
+}
+
+/**
+* Implementation of hook_apachesolr_cck_fields_alter.
+* Add the required CCK fields to apache solr.
+*/
+function nd_search_apachesolr_cck_fields_alter(&$mappings) {
+
+  $fields = content_fields();
+  foreach ($fields as $field) {
+    $mappings['per-field'][$field['field_name']] = array(
+      // The callback function gets called at indexing time to get the values.
+      'callback' => 'nd_search_indexing_callback',
+      // Common types are 'text', 'string', 'integer',
+      // 'double', 'float', 'date', 'boolean'
+      'index_type' => _get_solr_type($field['type']),
+    );
+  }
+
+}
+
+/**
+ * Get the corresponding apache solr type from a cck type.
+ * @param string $type CCK field type.
+ *
+ * @return array with type and prefix in apache solr.
+ */
+function _get_solr_type($type) {
+
+  $types = array(
+    'text' => 'string',
+    'number_integer' => 'integer',
+    'number_float' => 'float',
+    'filefield' => 'string',
+    'imagefield' => 'string',
+    'date' => 'date',
+  );
+
+  // Default type is text
+  if (!isset($types[$type])) {
+    return 'string';
+  }
+
+  return $types[$type];
+
+}
+
+/**
+* Put all the needed CCK fields in the index.
+* @node The current node being indexed
+* @fieldname The current field being indexed
+*
+* @return an array of arrays. Each inner array is a value, and must be
+* keyed 'safe' => $value
+*/
+function nd_search_indexing_callback($node, $fieldname) {
+
+  $fields = array();
+  foreach ($node->$fieldname as $field) {
+    if(isset($field['date_type'])) {
+      $date = strtotime($field['value']);
+      $date = apachesolr_date_iso($date);
+      $fields[] = array('value' => $date);
+    }
+    else {
+      $fields[] = array('value' => $field['safe']);
+    }
+
+  }
+
+  return $fields;
+
+}
+
+/**
+ * Implementation of hook_search_page for drupal core search.
+ */
+function node_search_page($results) {
+  $output = '';
+
+  foreach ($results as $key => $result) {
+    $node = $result['node'];
+    node_invoke_nodeapi($node, 'alter', TRUE, FALSE);
+    $output .= theme('node', $node, TRUE, FALSE);
+  }
+
+  $output .= theme('pager', NULL, 10, 0);
+
+  return $output;
+}
+
+/**
+ * Implementation of hook_search_page for apache solr search.
+ */
+function apachesolr_search_search_page($results) {
+  $output = '';
+
+  foreach ($results as $key => $result) {
+    $node = _solr_document_to_node($result);
+    $node->build_mode = NODE_BUILD_SEARCH_RESULT;
+    $output .= node_view($node);
+  }
+
+  $output .= theme('pager', NULL, 10, 0);
+
+  return $output;
+}

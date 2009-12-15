@@ -1,0 +1,44 @@
+/* $Id: ds.css,v 1.1 2009/10/18 15:25:22 swentel Exp $ */
+
+#fields td.region {
+  font-weight: bold;
+}
+#fields tr.region-message {
+  font-weight: normal;
+  color: #999;
+}
+#fields tr.region-populated {
+  display: none;
+}
+.field-region {
+  background-color: #ff6;
+  margin-top: 4px;
+  margin-bottom: 4px;
+  padding: 3px;
+}
+tr.region-css-disabled  {
+  filter:alpha(opacity=60);
+  -moz-opacity:0.6;
+  -khtml-opacity: 0.6;
+  opacity: 0.6;
+}
+.render-region .form-item {
+	margin-top: 0;
+	margin-bottom: 0;
+}
+#fields-content {
+	display: block;
+}
+#plugins-content {
+  display: none;
+}
+#display-tabs {
+  display: block;
+}
+#field-tab {
+  float: left;
+}
+#plugin-tab {
+  float: left;
+  margin-left: 20px;
+}

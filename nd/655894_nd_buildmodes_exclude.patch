@@ -1,0 +1,135 @@
+diff --git a/nd.module b/nd.module
+index 6cac3d6..1251c0e 100644
+--- nd.module
++++ nd.module
+@@ -10,7 +10,9 @@
+  * Implementation of hook_nodeapi().
+  */
+ function nd_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
+-
++  // Do not touch anything when all for node type is excluded
++  $exclude = variable_get('nd_buildmodes_exclude',array());
++  if ($exclude[$node->type]['ds_block_all']) return;
+   switch ($op) {
+     // Add has body property.
+     case 'load':
+@@ -19,31 +21,36 @@ function nd_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
+ 
+     // Determine build mode.
+     case 'view':
+-      if ($node->build_mode == NODE_BUILD_RSS) {
++      if ($node->build_mode == NODE_BUILD_RSS && !$exclude[$node->type]['nd_rss']) {
+         // For the RSS build mode, we need to manipulate right now.
+         _nd_nodeapi($node);
+       }
+       elseif ($node->build_mode == NODE_BUILD_PREVIEW) {
+-        $node->build_mode = $teaser == TRUE ? 'teaser' : 'full';
++        if ($teaser && !$exclude[$node->type]['nd_teaser']) {
++          $node->build_mode = 'nd_teaser';
++        } elseif (empty($teaser) && !$exclude[$node->type]['nd_full']) {
++          $node->build_mode = 'nd_full'; 
++        }
+         $node->has_body = node_get_types('type', $node->type)->has_body;
+       }
+       elseif ($node->build_mode === NODE_BUILD_NORMAL) {
+-        $build_mode = ($page) ? 'full' : 'teaser';
+-        $node->build_mode = $build_mode;
++        if ($page && !$exclude[$node->type]['nd_page']) {
++          $node->build_mode = 'nd_page';
++        } elseif ($teaser && !$exclude[$node->type]['nd_teaser']) {
++          $node->build_mode = 'nd_teaser';
++        } elseif (empty($teaser) && !$exclude[$node->type]['nd_full']) {
++          $node->build_mode = 'nd_full'; 
++        } // if no conditions meet, leave build build mode as normal 
+       }
+ 
+-      if ($node->build_mode == 'teaser' && $node->sticky == 1) {
+-        $node->build_mode = 'sticky';
++      if (in_array($node->build_mode,array('nd_full','nd_teaser')) && $node->sticky) {
++        $node->build_mode = 'nd_sticky';
+       }
+       break;
+ 
+     // Alter the node object for viewing.
+     case 'alter':
+-      // We ignore the RSS build mode, which is handled in the view operation.
+-      if ($node->build_mode == NODE_BUILD_RSS) {
+-        return;
+-      }
+-      _nd_nodeapi($node);
++      if (!$exclude[$node->type][$node->build_mode]) _nd_nodeapi($node);
+       break;
+   }
+ }
+@@ -69,6 +76,7 @@ function _nd_nodeapi(&$node) {
+       }
+     }  
+   }
++
+   ds_build_fields_and_regions($node, 'nd');
+ 
+   // Special support for RSS.
+@@ -126,21 +134,55 @@ function _nd_preprocess_node(&$vars, $hook) {
+  */
+ function nd_content_build_modes() {
+   $build_modes = array(
+-    'full' => array(
+-      'title' => t('Full node'),
++    'nd_page' => array(
++      'title' => t('Node page'),
+       'weight' => -1,
++      'build modes' => array(
++        'nd_page' => array(
++          'title' => t('Node page (nd)'),
++          'views style' => true,
++        ),
++      ),
+     ),
+-    'teaser' => array(
+-      'title' => t('Teaser'),
++    'nd_full' => array(
++      'title' => t('Full'),
+       'weight' => 1,
++      'build modes' => array(
++        'nd_full' => array(
++          'title' => t('Full node (nd)'),
++          'views style' => true,
++        ),
++      ),
++    ),    
++    'nd_teaser' => array(
++      'title' => t('Teaser'),
++      'weight' => 2,
++      'build modes' => array(
++        'nd_teaser' => array(
++          'title' => t('Teaser (nd)'),
++          'views style' => true,
++        ),
++      ),
+     ),
+-    'sticky' => array(
++    'nd_sticky' => array(
+       'title' => t('Sticky'),
+-      'weight' => 2,
++      'weight' => 3,
++      'build modes' => array(
++        'nd_sticky' => array(
++          'title' => t('Sticky (nd)'),
++          'views style' => true,
++        ),
++      ),
+     ),
+-    NODE_BUILD_RSS => array(
++    'nd_rss' => array(
+       'title' => t('RSS'),
+-      'weight' => 3,
++      'weight' => 4,
++      'build modes' => array(
++        'nd_rss' => array(
++          'title' => t('RSS (nd)'),
++          'views style' => true,
++        ),
++      ),
+     ),
+   );
+ 

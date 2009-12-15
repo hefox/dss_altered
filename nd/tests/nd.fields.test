@@ -1,0 +1,163 @@
+<?php
+// $Id: nd.fields.test,v 1.1.2.13 2009/10/24 13:32:29 swentel Exp $
+
+/**
+ * @file
+ * Tests for Node displays (fields)
+ */
+
+class NodeDisplaysFields extends DrupalWebTestCase {
+  /**
+   * Implementation of getInfo().
+   */
+  function getInfo() {
+    return array(
+      'name' => t('ND fields'),
+      'description' => t('Tests for ND fields.'),
+      'group' => t('Display suite'),
+    );
+  }
+
+  /**
+   * Implementation of setUp().
+   */
+  function setUp() {
+    parent::setUp('ds', 'nd');
+  }
+
+  /**
+   * Debug helper function. Writes values away to a text file in the files directory.
+   */
+  function _debugHelper($value, $writetype = 'a+') {
+    $debug = fopen($this->originalFileDirectory .'/simpletestdebug.txt', 'a+');
+    fwrite($debug, print_r($value, TRUE) ."\n");
+    fclose($debug);
+  }
+
+  /**
+   * Test custom fields.
+   */
+  function testNdCustomFields() {
+    $admin_user = $this->drupalCreateUser(array('administer content types', 'administer nodes'));
+    $this->drupalLogin($admin_user);
+    $this->drupalGet('admin/ds/nd/fields');
+
+    // Test being empty.
+    $fields = variable_get('nd_fields', array());
+    $this->assertEqual(array(), $fields, t('Fields are empty'), t('Fields.'));
+
+    // Valid field.
+    $edit = array(
+      'code_key' => 'test_field',
+      'code_title' => 'Test field label',
+      'code_code' => '<?php echo "test"; ?>',
+    );
+    $this->drupalPost('admin/ds/nd/fields', $edit, t('Save code field'));
+    $fields = variable_get('nd_fields', array());
+    $this->assertTrue(array_key_exists('test_field', $fields), t('test_field exists'), t('Fields'));
+    $this->assertEqual($fields['test_field']['title'], $edit['code_title'], t('Title equals Test field label'), t('Fields'));
+    $this->assertEqual($fields['test_field']['code'], $edit['code_code'], t('Code equals <?php echo "test"; ?>'), t('Fields'));
+
+    // Try to add the same custom field, must fail.
+    $this->drupalPost('admin/ds/nd/fields', $edit, t('Save code field'));
+    $this->assertText(t('This field already exists.'), 'Key already exists', t('Fields.'));
+
+    // Update field.
+    $edit = array(
+      'code_key' => 'test_field',
+      'code_title' => 'Test field label 2',
+      'code_code' => '<?php echo "test"; ?>',
+    );
+    $this->drupalPost('admin/ds/nd/fields/edit/test_field', $edit, t('Save code field'));
+    $fields = variable_get('nd_fields', array());
+    $this->assertEqual($fields['test_field']['title'], $edit['code_title'], t('Label equals Test field label 2'), t('Fields'));
+    $this->assertEqual(count($fields), 1, t('Only 1 field'), t('Custom fields'));
+
+    // Add new field.
+    $edit = array(
+      'code_key' => 'test_field_two',
+      'code_title' => 'Test label 3',
+      'code_code' => 'My code',
+      'code_exclude[page]' => TRUE,
+    );
+    $this->drupalPost('admin/ds/nd/fields', $edit, t('Save code field'));
+    $fields = variable_get('nd_fields', array());
+    $this->assertEqual($fields['test_field_two']['title'], $edit['code_title'], t('Title equals Test label 3'), t('Fields'));
+    $this->assertEqual(count($fields), 2, t('2 custom fields found'), t('Custom fields'));
+    $out = $this->drupalGet('admin/ds/layout/page/display');
+    $this->_debugHelper($out);
+    $this->assertNoRaw('Test label 3', t('Custom field excluded on page node type'), t('Custom fields'));
+    $this->drupalGet('admin/ds/layout/story/display');
+    $this->assertRaw('Test label 3', t('Custom field available on story node type'), t('Custom fields'));
+
+    // Delete field.
+    $this->drupalPost('admin/ds/nd/fields/delete/test_field_two', array(), t('Delete'));
+    $fields = variable_get('nd_fields', array());
+    $this->assertFalse(array_key_exists('test_field_two', $fields), t('test_field_two removed'), t('Fields'));
+    $this->assertEqual(count($fields), 1, t('Only 1 field'), t('Custom fields'));
+
+    // Override field.
+    $edit = array(
+      'code_key' => 'read_more',
+      'code_title' => 'Override read more',
+      'code_code' => '<?php echo "test"; ?>',
+    );
+    $this->drupalPost('admin/ds/nd/fields/edit/read_more', $edit, t('Save code field'));
+    $fields = variable_get('nd_fields', array());
+    $this->assertEqual($fields['read_more']['type'], DS_FIELD_OVERRIDDEN, t('Read more is overridden'), t('Fields'));
+    $this->assertEqual($fields['read_more']['title'], $edit['code_title'], t('Label equals Override read more'), t('Fields'));
+    $this->assertEqual(count($fields), 2, t('2 fields'), t('Custom fields'));
+
+    // Reset overridden field.
+    $this->drupalPost('admin/ds/nd/fields/delete/read_more', array(), t('Reset'));
+    $fields = variable_get('nd_fields', array());
+    $this->assertFalse(array_key_exists('read_more', $fields), t('read_more removed'), t('Fields'));
+    $this->assertEqual(count($fields), 1, t('Only 1 field'), t('Custom fields'));
+
+    // Invalid key.
+    $edit = array(
+      'code_key' => 'test_key moehaha',
+      'code_title' => 'Test label',
+      'code_code' => 'test code',
+    );
+    $this->drupalPost('admin/ds/nd/fields', $edit, t('Save code field'));
+    $this->assertText(t('The machine-readable name must contain only lowercase letters and underscores.'), 'Key is not valid', t('Fields'));
+
+    // Add new field and test with real code :)
+    $edit = array(
+      'code_key' => 'test_field_real',
+      'code_title' => 'Real field',
+      'code_code' => '<?php echo "Day: ". date("d", $object->created); ?>',
+    );
+    $this->drupalPost('admin/ds/nd/fields', $edit, t('Save code field'));
+    // Create page.
+    $page_node = $this->drupalCreateNode();
+
+    // Let's do another one..
+    $edit = array(
+      'title[full][region]' => 'header',
+      'test_field_real[full][region]' => 'middle',
+    );
+    $this->drupalPost('admin/ds/layout/page/display', $edit, t('Save'));
+
+    // See if it's rendered.
+    $this->drupalGet('node/'. $page_node->nid);
+    $this->assertText('Day: '. date("d", $page_node->created), t('Custom field executed.'), t('Fields'));
+
+    // Test with token module (if available).
+    $token = drupal_get_filename('module', 'token');
+    if (!empty($token)) {
+      module_enable(array('token'));
+      $edit = array(
+        'code_key' => 'test_field_real',
+        'code_title' => 'Real field',
+        'code_code' => 'Day: [d]',
+      );
+
+      $this->drupalPost('admin/ds/nd/fields/edit/test_field_real', $edit, t('Save code field'));
+      $fields = variable_get('nd_fields', array());
+      $this->drupalGet('node/'. $page_node->nid);
+      $this->assertText('Day: '. date("j", $page_node->created), t('Custom field executed with token support.'), t('Fields'));
+    }
+  }
+}

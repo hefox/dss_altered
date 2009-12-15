@@ -1,0 +1,79 @@
+diff --git a/nd_cck/nd_cck.module b/nd_cck/nd_cck.module
+index e1c6f94..d6de808 100644
+--- nd_cck/nd_cck.module
++++ nd_cck/nd_cck.module
+@@ -7,50 +7,6 @@
+  */
+ 
+ /**
+- * Implementation of hook_ds_buildmodes_alter().
+- */
+-function nd_cck_ds_buildmodes_alter(&$build_modes) {
+-  // Drop some stuff from CCK.
+-  unset($build_modes['nd']['basic']);
+-  unset($build_modes['nd']['token']);
+-  unset($build_modes['nd']['rss']);
+-  unset($build_modes['nd']['search']);
+-}
+-
+-/**
+- * Implementation of hook_menu_alter().
+- */
+-function nd_cck_menu_alter(&$items) {
+-  if (!defined('MAINTENANCE_MODE') && variable_get('content_schema_version', -1) >= 6007) {
+-
+-    $nd_path = drupal_get_path('module', 'nd');
+-    $nd_cck_path = drupal_get_path('module', 'nd_cck');
+-    $build_modes = content_build_modes('_tabs');
+-
+-    // Unset fields tab.
+-    unset($items['admin/content/types/fields']);
+-
+-    foreach (node_get_types() as $type) {
+-      $type_name = $type->type;
+-      $content_type = content_types($type_name);
+-      $type_url_str = $content_type['url_str'];
+-
+-      // Disable default local display tab.
+-      $display_path = 'admin/content/node-type/'. $type_url_str .'/display';
+-      unset($items[$display_path]);
+-
+-      // Disable tabs with page arguments[0] not being nd_content_display_overview_form.
+-      foreach ($build_modes as $key => $tab) {
+-        $display_path = 'admin/content/node-type/'. $type_url_str .'/display/'. $key;
+-        if ($items[$display_path]['page arguments'][0] != 'nd_display_overview_form') {
+-          unset($items[$display_path]);
+-        }
+-      }
+-    }
+-  }
+-}
+-
+-/**
+  * Implementation of hook_ds_fields().
+  */
+ function nd_cck_ds_fields($type_name, $build_mode, $extra) {
+@@ -79,8 +35,21 @@ function nd_cck_ds_fields($type_name, $build_mode, $extra) {
+  * Implementation of hook_form_alter().
+  */
+ function nd_cck_form_alter(&$form, $form_state, $form_id) {
+-  if ($form_id == 'ds_display_overview_form') {
+-    $form['#submit'][] = 'nd_cck_display_overview_form_submit';
++  switch($form_id) {
++    case 'ds_display_overview_form':
++      $form['#submit'][] = 'nd_cck_display_overview_form_submit';
++      break;
++    case 'content_display_overview_form':
++      $type_name = $form['#type_name'];
++      $context = $form['#contexts'];
++      $content_type = content_types($type_name);
++      $type_url_str = $content_type['url_str'];    
++      $exclude = variable_get('nd_buildmodes_exclude',array());
++      if (!$exclude[$type_name]['ds_block_all'] && !$exclude[$type_name][$context]) {
++        drupal_set_message("This display for this content type is being managed by display suite.", 'warning',false);
++        drupal_goto('admin/ds/layout/'. $type_url_str .'/'. $context);
++      }
++      break;
+   }
+ }
+ 
